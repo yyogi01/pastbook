@@ -1,0 +1,76 @@
+Description: >
+
+    This stack contains the ECR repository which will hold the images for our
+    built application. We allow any users associated with this account to push/push to/from this repository.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: production
+    Description: A name for the environment that this cloudformation will be part of.
+
+  RepositoryName:
+    Description: The name of the ECR repository
+    Type: String
+
+Resources:
+  Repository:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: !Ref RepositoryName
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS:
+                !Ref AWS::AccountId
+            Action:
+              - "ecr:*"
+              - "ecr:GetAuthorizationToken"
+      LifecyclePolicy:  
+        LifecyclePolicyText: |
+          {
+            "rules": [
+                {
+                    "rulePriority": 1,
+                    "description": "Expire images older than 14 days",
+                    "selection": {
+                        "tagStatus": "untagged",
+                        "countType": "sinceImagePushed",
+                        "countUnit": "days",
+                        "countNumber": 14
+                    },
+                    "action": {
+                        "type": "expire"
+                    }
+                }
+            ]
+          }
+  MyReplicationConfig:
+    Type: AWS::ECR::ReplicationConfiguration
+    Properties:
+      ReplicationConfiguration: 
+          Rules:
+            - 
+              Destinations:
+                - 
+                  Region: "us-east-1"
+                  RegistryId: !Sub ${AWS::AccountId}
+
+Outputs:
+
+  RepositoryArn:
+    Value: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${Repository}
+    Export:
+      Name: !Join [ ':', [ !Ref 'EnvironmentName', 'RepositoryArn']]
+  RepositoryUri:
+    Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${Repository}
+    Export:
+      Name: !Join [ ':', [ !Ref 'EnvironmentName', 'RepositoryUri' ] ]
+  RepositoryName:
+    Value: !Ref Repository
+    Export:
+      Name: !Join [ ':', [ !Ref 'EnvironmentName', 'RepositoryName' ] ]
